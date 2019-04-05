@@ -4,29 +4,40 @@
 ### Get Code
 ```bash
 git clone https://github.com/geopython/pygeoapi.git  pygeoapi.git
+
+# NB latest master did not work (see below) on apr 5, 2019.
+
+Fixed in https://github.com/justb4/pygeoapi
+
 ```
 
 ### Setup Python3 VirtualEnv
 
-Try with Python 3.7.1.
+Try with Python 3.6.7 on clean Ubuntu 18.04.
 
 ```bash
 
-# Using virtualenv
-virtualenv -p python pygeoapi
-cd pygeoapi.git
-. bin/activate
 
-# Using pyenv
-pyenv virtualenv 3.7.1 pygeoapi37
-pyenv activate pygeoapi37
+# Pre-install
+sudo apt install virtualenv
+sudo apt install sqlite3
+sudo apt install libsqlite3-dev     # ??
+sudo apt-get install libspatialite7 # ??
+sudo apt-get install libsqlite3-mod-spatialite 
+
+# Using virtualenv
+mkdir pygeoapi
+cd pygeoapi
+virtualenv -p python3 venv3.6
+. venv3.6/bin/activate
 
 ```
 
 ### Install
 
 ```bash
-cd pygeoapi.git
+git clone https://github.com/geopython/pygeoapi.git  git
+cd git
 pip install --upgrade pip
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
@@ -37,20 +48,38 @@ pip install -e .
 ### Configure
 
 ```bash
-cp pygeoapi-config.yml local.config.yml
+# maak eigen config dir
+mkdir config
+cp git/pygeoapi-config.yml config/local.config.yml
 # edit local.config.yml
-# TODO: what is most important to edit?
-export PYGEOAPI_CONFIG=/Users/just/project/ogg/wfs3/pygeoapi.git/local.config.yml
-# generate OpenAPI Document
-pygeoapi generate-openapi-document -c local.config.yml > openapi.yml
-export PYGEOAPI_OPENAPI=/path/to/openapi.yml
+#     url: http://wfs3.opengeogroep.nl:5000/
+# comment out many providers in particular ElasticSearch deps
+
+export PYGEOAPI_CONFIG=/home/ogg/pygeoapi/config/local.config.yml
+export PYGEOAPI_OPENAPI=/home/ogg/pygeoapi/config/openapi.yml
+
+# generate OpenAPI Document ; must be in git dir!
+cd git
+pygeoapi generate-openapi-document -c ${PYGEOAPI_CONFIG} > ${PYGEOAPI_OPENAPI}
+
+```
+
+### Serve
+
+```bash
+cd git
 pygeoapi serve
+
+
 ```
 
 ## Findings
 
+### Eleastic serarch error
+
 * need to comment out eleasticsearch from config.yml
-* Mac OSX: sqlite error (sqlite3 is installed via HomeBrew): 
+
+### GeoPackage error
 
 ```bash
 pygeoapi generate-openapi-document -c local.config.yml > openapi.yml
@@ -101,3 +130,19 @@ Traceback (most recent call last):
     self.cursor.execute("DROP TABLE IF EXISTS {}".format(self.view))
 AttributeError: 'GeoPackageProvider' object has no attribute 'cursor'
 ```
+
+Solution: install at least:
+
+sudo apt-get install libsqlite3-mod-spatialite 
+
+ 
+ 
+### Invalid Format error on all requests
+
+Opened issue:
+https://github.com/geopython/pygeoapi/issues/89
+
+Fixed in fork: rewrite `check_format()` function:
+
+https://github.com/justb4/pygeoapi/blob/master/pygeoapi/api.py#L635
+
