@@ -1,13 +1,23 @@
 # 
-## Installatie
+## Installation
+
+### Dir layout
+
+In `/home/ogg/pygeoapi`
+
+ * `config/` : all config files (`local.config.yml` and `openapi.yml`)
+ * `git` : master from https://github.com/geopython/pygeoapi.git 
+ * `justb4.git` fork with fixes from  https://github.com/justb4/pygeoapi
 
 ### Get Code
+
 ```bash
 git clone https://github.com/geopython/pygeoapi.git  pygeoapi.git
 
 # NB latest master did not work (see below) on apr 5, 2019.
 
-Fixed in https://github.com/justb4/pygeoapi
+# Fixed in Fork: 
+https://github.com/justb4/pygeoapi
 
 ```
 
