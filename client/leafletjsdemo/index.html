@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css" integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA==" crossorigin="" />
+  <style>
+    body {
+      font-family: "proxima-nova", "museo", "Helvtica", Arial, sans-serif;
+    }
+
+    .map {
+      height: 400px;
+      width: 100%;
+      margin-bottom: 2em;
+    }
+
+    .log {
+      height: 200px;
+      width: 100%;
+      overflow-y: auto;
+      border: 1px solid grey;
+      color: #eeeeee;
+      background-color: #222222;
+      font-family: Inconsolata, monospace;
+      font-size: 1.5em;
+    }
+
+    #wfs3url {
+      width: 600px;
+    }
+  </style>
+  <script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" integrity="sha512-QVftwZFqvtRNi0ZyCtsznlKSWOStnDORoefr1enyq5mVL4tmKB3S/EnC3rRJcxCPavG10IcrVGSmPh6Qw5lwrg==" crossorigin=""></script>
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+  <title>WFS3 OpenGeoGroep demo (Leaflet JS)</title>
+</head>
+
+<body>
+  <h1>WFS 3 test client</h1>
+  <div>
+    <p>This client is very basic and work in progress. It's goals is to demonstrate the usage of WFS3 APIs and to test different implementations. Enter a WFS 3 API document URL to see what data is offered by the WFS 3 API. The logging screen below the map
+      shows which HTTP requests are sent.</p>
+    <p><label for="wfs3url">WFS 3 API doc URL: <input type="text" id="wfs3url" value="http://localhost:5000/api" onchange="initWFS3(this.value)" autocomplete="off" /> </label>
+      <button onclick="initWFS3()" id="go">Go</button>
+    </p>
+  </div>
+  <div>
+    Examples:
+    <ul>
+      <li>http://localhost:5000/api (local testing)</li>
+      <li>http://wfs3.opengeogroep.nl:5000/api (OFFLINE)</li>
+      <li>https://www.ldproxy.nrw.de/topographie</li>
+      <li>https://beta-paikkatieto.maanmittauslaitos.fi/geographic-names/wfs3/v1/api</li>
+    </ul>
+    <ul id="collections">
+    </ul>
+  </div>
+
+  <div id="map" class="map"></div>
+  <div id="log" class="log"></div>
+  <script>
+    var map = L.map('map').setView([52.1, 5.2], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var _baseurl = ""
+    var _collectionsurl = wfs3url + "/collections";
+    var _collectionId = "";
+    var _collections = []
+    // TODO: implement
+    var _limit = 50;
+
+    function logUrl(url) {
+      $("#log").prepend(new Date().toUTCString() + " -> " + url + "</br>");
+    }
+
+    // init: get the collections of the WFS3 API
+    function initWFS3(wfs3url) {
+      $("#go").prop("disabled", true);
+      if (!wfs3url) wfs3url = $("#wfs3url").val();
+      $("#collections").html("")
+      // Access the API doc and try to process the collections resource
+      $.getJSON(wfs3url, function(data) {
+        logUrl(wfs3url)
+        _baseurl = wfs3url.replace("/api", "")
+        _collectionsurl = _baseurl + "/collections"
+        // get the collections of the WFS 3 API
+        $.getJSON(_collectionsurl, function(colldata) {
+          logUrl(_collectionsurl)
+          for (var c in colldata["collections"]) {
+            var coll = colldata["collections"][c];
+            // get the name as the id
+            var li = "<li id='li_" + coll["name"] + "'><button onclick='addCollection(\"" + coll["name"] + "\")'>" + coll["title"] + " (" + coll["name"] + ")</button></li>";
+            $("#collections").append(li);
+          }
+          $("#go").prop("disabled", false);
+        });
+      });
+    }
+
+    function nextData(reqUrl, collectionId) {
+      // TODO: remove previous data?
+      loadWFS3Data(reqUrl, collectionId);
+    }
+
+    function addCollection(collectionId) {
+      _collectionId = collectionId;
+      var reqUrl = _collectionsurl + "/" + collectionId + "/items";
+      loadWFS3Data(reqUrl, collectionId);
+    }
+
+    // load geoJSON encoded data from a URL (in fact: from a WFS 3 collection URL)
+    function loadWFS3Data(reqUrl, collectionId) {
+      // http://localhost:5000/collections/pc5/items/?&limit=100
+      $.getJSON(reqUrl, function(data) {
+        logUrl(reqUrl)
+        var wfs3layer = L.geoJSON(data, {
+          style: function(feature) {
+            // very basic styling..
+            return {
+              color: "#0000bb"
+            };
+          }
+        }).bindPopup(function(layer) {
+          var pp = "<ul>";
+          for (var p in layer.feature.properties) {
+            pp += "<li>" + p + ": " + layer.feature.properties[p] + "</li>"
+          }
+          pp += "</ul>"
+          return pp;
+        }).addTo(map);
+        // add the next and prev URLs if provided in the geojson response
+        var liId = "li_" + collectionId
+        if ($("#" + liId)) {
+          for (var l in data.links) {
+            var lnk = data.links[l];
+            if (lnk.rel == "next" || lnk.rel == "prev") {
+              var btnId = "btn_" + lnk.rel + "_" + collectionId
+              var btn = "<button id='" + btnId + "' onclick='nextData(\"" + lnk.href + "\", \"" + collectionId + "\")'>" + lnk.title + "</button>";
+              if ($("#" + btnId).length > 0) {
+                $("#" + btnId).replaceWith(btn)
+              } else {
+                $("#" + liId).append(btn)
+              }
+            }
+          }
+        }
+        map.fitBounds(wfs3layer.getBounds());
+      });
+    }
+  </script>
+
+</body>
+
+</html>
